@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.dafeiyu.pet"
+    android:versionCode="122"
+    android:versionName="1.2.2">
+
+    <!-- Android 11+ 包可见性：不看声明就看不到系统语音识别服务 -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:label="大肥鱼"
+        android:icon="@drawable/ic_launcher"
+        android:hardwareAccelerated="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".ChatActivity"
+            android:theme="@android:style/Theme.DeviceDefault.Dialog"
+            android:windowSoftInputMode="adjustResize"
+            android:launchMode="singleTop"
+            android:exported="false" />
+        <!-- 自动化测试入口：adb 广播灌手势 / 求值 JS。只认 shell 和本应用自己发的广播 -->
+        <receiver
+            android:name=".DbgReceiver"
+            android:permission="android.permission.DUMP"
+            android:exported="true" />
+        <service
+            android:name=".PetService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <!-- Android 14+ 要求 specialUse 类型必须声明用途子类型 -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="desktop pet floating overlay" />
+        </service>
+    </application>
+</manifest>

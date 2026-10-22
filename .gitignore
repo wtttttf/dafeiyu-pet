@@ -1,0 +1,34 @@
+# 构建产物
+build/
+*.apk
+*.apk.idsig
+
+# 签名（仓库不含密钥）
+debug.keystore
+*.jks
+*.keystore
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+*.iml
+
+# 本地备份与本机素材
+*.bak*
+*.bak-*
+*.bak2-*
+*.bak3-*
+*.bak4-*
+*.bak5-*
+*.bak6-*
+*.bak7-*
+
+# 本机参考（第三方 three.js 与原型，未纳入仓库）
+ref/
+
+# 本机开发记录
+dsh-changes-*.md
+
+# Python 缓存
+__pycache__/
+*.pyc
