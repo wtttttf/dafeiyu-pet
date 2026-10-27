@@ -37,10 +37,12 @@ public class ChatActivity extends Activity {
     private static final int REQ_MIC = 21, REQ_VOICE = 22;
 
     private EditText input;
-    private TextView reply, nameView, closeView;
+    private TextView reply, nameView, closeView, modeBtn;
     private Button send, mic;
     private FrameLayout root;
-    private LinearLayout bubble;
+    private LinearLayout bubble, row;
+    private MaxScroll replyScroll;
+    private boolean showingReply;
     private TailView tail;
     private final Handler h = new Handler(Looper.getMainLooper());
     private int bubbleW, tailH, bubbleH;
@@ -87,6 +89,22 @@ public class ChatActivity extends Activity {
         nameView.setTextColor(0xFF2C4BFF);
         nameView.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         head.addView(nameView);
+
+        modeBtn = new TextView(this);
+        modeBtn.setText(voiceMode ? "⌨️" : "🎤");
+        modeBtn.setTextColor(0xFF2C4BFF);
+        modeBtn.setPadding(dp(8), 0, dp(8), 0);
+        modeBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                voiceMode = !voiceMode;
+                getSharedPreferences(PetService.PREFS, MODE_PRIVATE).edit()
+                        .putString("input_mode", voiceMode ? "voice" : "text").apply();
+                modeBtn.setText(voiceMode ? "⌨️" : "🎤");
+                showReplyState(false);
+            }
+        });
+        head.addView(modeBtn);
+
         closeView = new TextView(this);
         closeView.setText("✕");
         closeView.setTextColor(0xFF9AA4BC);
@@ -103,13 +121,19 @@ public class ChatActivity extends Activity {
         reply.setTextColor(0xFF1E2A44);
         /* 不再截断行数：长回复完整显示，超过屏幕 45% 再滚动 */
         reply.setMaxLines(Integer.MAX_VALUE);
-        MaxScroll sc = new MaxScroll(this, (int) (getResources().getDisplayMetrics().heightPixels * 0.45f));
-        sc.addView(reply, new FrameLayout.LayoutParams(
+        reply.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showReplyState(false); }
+        });
+        replyScroll = new MaxScroll(this, (int) (getResources().getDisplayMetrics().heightPixels * 0.45f));
+        replyScroll.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showReplyState(false); }
+        });
+        replyScroll.addView(reply, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        bubble.addView(sc, new LinearLayout.LayoutParams(
+        bubble.addView(replyScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout row = new LinearLayout(this);
+        row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         input = new EditText(this);
         input.setHint("说点什么…");
@@ -146,6 +170,7 @@ public class ChatActivity extends Activity {
         input.setVisibility(voiceMode ? View.GONE : View.VISIBLE);
         send.setVisibility(voiceMode ? View.GONE : View.VISIBLE);
         mic.setVisibility(voiceMode ? View.VISIBLE : View.GONE);
+        replyScroll.setVisibility(View.GONE);
 
         tail = new TailView(this);
         applyMetrics();
@@ -162,7 +187,7 @@ public class ChatActivity extends Activity {
         if (autoVoice) bubble.postDelayed(new Runnable() {
             public void run() { startVoice(); }
         }, 260);
-        if (!voiceMode) input.requestFocus();
+        showReplyState(false);
     }
 
     static ChatActivity current;
@@ -188,6 +213,7 @@ public class ChatActivity extends Activity {
         bubble.setPadding(pad, (int) (dp(9) * fs), pad, pad);
         nameView.setTextSize(13 * fs);
         closeView.setTextSize(13 * fs);
+        modeBtn.setTextSize(15 * fs);
         reply.setTextSize(14 * fs);
         reply.setPadding(0, (int) (dp(6) * fs), 0, (int) (dp(8) * fs));
         input.setTextSize(14 * fs);
@@ -331,22 +357,37 @@ public class ChatActivity extends Activity {
         ArrayList<String> list = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
         if (list == null || list.isEmpty()) return;
         String text = list.get(0);
+        showReplyState(true);
         reply.setText("你说：" + text);
         ChatClient.send(this, text, new ChatClient.Cb() {
-            public void onReply(String s) { reply.setText(s); PetService.say(s); }
+            public void onReply(String s) { reply.setText(s); }
         });
+    }
+
+    /** 回复态 / 输入态互斥：同一张气泡里只显示一个 */
+    private void showReplyState(boolean on) {
+        showingReply = on;
+        if (replyScroll != null) replyScroll.setVisibility(on ? View.VISIBLE : View.GONE);
+        if (row != null) row.setVisibility(on ? View.GONE : View.VISIBLE);
+        if (!on) {
+            input.setVisibility(voiceMode ? View.GONE : View.VISIBLE);
+            send.setVisibility(voiceMode ? View.GONE : View.VISIBLE);
+            mic.setVisibility(voiceMode ? View.VISIBLE : View.GONE);
+            if (!voiceMode) input.requestFocus();
+        }
+        if (bubble != null) bubble.requestLayout();
     }
 
     private void doSend() {
         final String text = input.getText().toString().trim();
         if (text.isEmpty()) return;
         send.setEnabled(false);
+        showReplyState(true);
         reply.setText("……");
         ChatClient.send(this, text, new ChatClient.Cb() {
             public void onReply(String s) {
                 send.setEnabled(true);
                 reply.setText(s);
-                PetService.say(s);
             }
         });
     }

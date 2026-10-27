@@ -20,9 +20,7 @@ qemu-x86_64 "$BT/aapt2" link -o "$OUT/app.unsigned.apk" \
   -0 webm \
   --java "$OUT/gen" \
   --min-sdk-version 26 \
-  --target-sdk-version 34 \
-  --version-code 1 \
-  --version-name 1.0
+  --target-sdk-version 34
 
 echo "3/6 编译 Java"
 javac -source 1.8 -target 1.8 \
@@ -45,7 +43,7 @@ qemu-x86_64 "$BT/zipalign" -f 4 app.withdex.apk app.aligned.apk
 echo "6/6 签名"
 "$BT/apksigner" sign --ks "$APP/debug.keystore" --ks-pass pass:android \
   --key-pass pass:android --out "$APP/dafeiyu-pet.apk" app.aligned.apk
-cp -f "$APP/dafeiyu-pet.apk" "$APP/dafeiyu-pet-v1.2.2.apk"
+cp -f "$APP/dafeiyu-pet.apk" "$APP/dafeiyu-pet-v1.2.9.apk"
 
 echo ""
 echo "=== 完成 ==="

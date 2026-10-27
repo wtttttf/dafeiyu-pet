@@ -32,6 +32,8 @@ import android.webkit.WebViewClient;
 import android.widget.ImageView;
 
 import java.util.ArrayList;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 /**
  * 大肥鱼桌宠（3D 版）。
@@ -99,6 +101,8 @@ public class PetService extends Service {
     private WindowManager wm;
     private View petView;
     private WebView webView;
+    private WebView perfView;          // 表演抽屉（全屏覆盖层，打开时压在桌宠上面）
+    private boolean perfOpening;       // 正在取数据/建视图，防连点开出两层
     private ImageView fallback;
     private WindowManager.LayoutParams params;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -296,6 +300,124 @@ public class PetService extends Service {
         Log.i(TAG, "WebView 已加载 pet.html，窗口 " + params.width + "x" + params.height);
     }
 
+    // ==================== 表演抽屉 ====================
+    // 一个全屏覆盖 WebView：HTML 画遮罩 + 右侧抽屉，滑入滑出。
+    // 不用 Activity 是因为后台 startActivity 会被 MIUI 拦；这里走已有的悬浮窗权限。
+
+    private void openPerfListInternal() {
+        if (perfView != null || perfOpening || webView == null || wm == null) return;
+        perfOpening = true;
+        // evaluateJavascript 的回调万一没回来，别把列表按钮永久锁死
+        ui.postDelayed(new Runnable() {
+            public void run() { perfOpening = false; }
+        }, 3000);
+        webView.evaluateJavascript(
+                "window.__perfData ? JSON.stringify(window.__perfData()) : 'null'",
+                new ValueCallback<String>() {
+                    public void onReceiveValue(String value) {
+                        String json = "null";
+                        try {
+                            Object o = new JSONTokener(value == null ? "null" : value).nextValue();
+                            if (o instanceof String) json = (String) o;
+                            else if (o != null) json = o.toString();
+                        } catch (Throwable t) {
+                            Log.w(TAG, "表演数据解析失败: " + value, t);
+                        }
+                        perfOpening = false;
+                        showPerfView(mergeSettings(json));
+                    }
+                });
+    }
+
+    /** 把原生设置/桌宠位置并进 __perfData 的结果，settings.html 一次拿全 */
+    private String mergeSettings(String base) {
+        try {
+            JSONObject root;
+            try { root = new JSONObject(base); }
+            catch (Throwable t) { root = new JSONObject(); }
+            JSONObject pet = new JSONObject();
+            pet.put("x", params.x); pet.put("y", params.y);
+            pet.put("w", params.width); pet.put("h", params.height);
+            root.put("pet", pet);
+            JSONObject scr = new JSONObject();
+            scr.put("w", screenW); scr.put("h", screenH);
+            scr.put("density", getResources().getDisplayMetrics().density);
+            root.put("screen", scr);
+            SharedPreferences sp = getSharedPreferences(PREFS, MODE_PRIVATE);
+            JSONObject st = new JSONObject();
+            st.put("scale", scale);
+            st.put("wander", wanderOn);
+            st.put("mode", sp.getString(KEY_MODE, "normal"));
+            st.put("voice", "voice".equals(sp.getString("input_mode", "text")));
+            st.put("speech", sp.getBoolean("speech_enabled", true));
+            st.put("sfx", sp.getBoolean("sfx_enabled", true));
+            st.put("link", sp.getBoolean("link_enabled", false));
+            st.put("useApi", sp.getBoolean("use_api", true));
+            root.put("settings", st);
+            return root.toString();
+        } catch (Throwable t) {
+            Log.w(TAG, "设置数据拼装失败", t);
+            return base;
+        }
+    }
+
+    private void showPerfView(final String json) {
+        if (perfView != null || wm == null) return;
+        WebView w = new WebView(this);
+        w.setBackgroundColor(Color.TRANSPARENT);
+        w.setVerticalScrollBarEnabled(false);
+        w.setHorizontalScrollBarEnabled(false);
+        w.setOverScrollMode(View.OVER_SCROLL_NEVER);
+
+        WebSettings s = w.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setAllowFileAccess(true);
+        s.setAllowContentAccess(true);
+        s.setSupportZoom(false);
+        s.setBuiltInZoomControls(false);
+        s.setDisplayZoomControls(false);
+        s.setUseWideViewPort(false);
+        s.setCacheMode(WebSettings.LOAD_NO_CACHE);
+
+        w.addJavascriptInterface(new Bridge(), "AndroidBridge");
+        w.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                v.evaluateJavascript("window.settingsRender(" + json + ")", null);
+            }
+        });
+
+        WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
+                PixelFormat.TRANSLUCENT);
+        lp.gravity = Gravity.TOP | Gravity.START;
+        perfView = w;
+        try {
+            wm.addView(w, lp);
+        } catch (Throwable t) {
+            Log.e(TAG, "表演抽屉 addView 失败", t);
+            perfView = null;
+            try { w.destroy(); } catch (Throwable ignored) { }
+            return;
+        }
+        w.loadUrl("file:///android_asset/settings.html");
+    }
+
+    private void closePerfListInternal() {
+        perfOpening = false;
+        if (perfView == null) return;
+        WebView w = perfView;
+        perfView = null;
+        try { if (wm != null) wm.removeView(w); } catch (Throwable ignored) { }
+        try { w.destroy(); } catch (Throwable ignored) { }
+    }
+
     // ==================== 拖拽：原生在这里直接接管 ====================
     // 触摸事件本来就先过 WebView 的 dispatchTouchEvent，OnTouchListener 就是这一步的第一站。
     // 在这儿直接改窗口位置，比"页面 touchmove → 跨语言回调 → post 回主线程"少绕整整一圈，
@@ -314,16 +436,16 @@ public class PetService extends Service {
                 cancelLongPress();
                 cancelPttStart();
                 if (e.getY() > params.height * 0.12) {
-                    /* 按住 220ms 没动 → 开始录音（微信式按住说话）；短按仍算点击 */
+                    /* 长按改为打开聊天气泡：语音/文字由气泡里的按钮切换，不再按住录音 */
                     pttStartTask = new Runnable() {
                         public void run() {
                             pttStartTask = null;
                             if (nativeDrag || pinching) return;
                             nativeUpAt = SystemClock.uptimeMillis();
-                            pttStart();
+                            openChat();
                         }
                     };
-                    ui.postDelayed(pttStartTask, 220);
+                    ui.postDelayed(pttStartTask, 300);
                 }
                 break;
 
@@ -823,6 +945,7 @@ public class PetService extends Service {
     }
 
     private void swapView(View v) {
+        closePerfListInternal();      // 换渲染视图时抽屉里的 WebView 也一起收掉，避免叠在旧页面上
         if (petView != null) {
             try { wm.removeView(petView); } catch (Throwable ignored) { }
         }
@@ -946,6 +1069,120 @@ public class PetService extends Service {
             });
         }
 
+
+        /** 打开表演抽屉：81 段名字和分类直接从 pet.html 的 __perfData 取，不在原生再抄一份 */
+        @JavascriptInterface
+        public void openPerfList() {
+            ui.post(new Runnable() {
+                public void run() { openPerfListInternal(); }
+            });
+        }
+
+        @JavascriptInterface
+        public void closePerfList() {
+            ui.post(new Runnable() {
+                public void run() { closePerfListInternal(); }
+            });
+        }
+
+        /** 抽屉里点了某段表演：先收抽屉，再让桌宠播 */
+        @JavascriptInterface
+        public void playPerf(final String name) {
+            ui.post(new Runnable() {
+                public void run() {
+                    closePerfListInternal();
+                    if (name != null && name.length() > 0) {
+                        js("window.__petPlay && window.__petPlay(" + JSONObject.quote(name) + ")");
+                    }
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void openSettingsPanel() {
+            ui.post(new Runnable() { public void run() { openPerfListInternal(); } });
+        }
+
+        @JavascriptInterface
+        public void closeSettings() {
+            ui.post(new Runnable() { public void run() { closePerfListInternal(); } });
+        }
+
+        @JavascriptInterface
+        public void closePet() {
+            ui.post(new Runnable() {
+                public void run() {
+                    closePerfListInternal();
+                    android.widget.Toast.makeText(PetService.this, "大肥鱼下班了", android.widget.Toast.LENGTH_SHORT).show();
+                    stopForeground(true);
+                    stopSelf();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setScale(final float v) {
+            ui.post(new Runnable() { public void run() { applyScale(v, true); } });
+        }
+
+        @JavascriptInterface
+        public void setWander(final boolean on) {
+            ui.post(new Runnable() {
+                public void run() {
+                    wanderOn = on;
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_WANDER, on).apply();
+                    js("window.__petWander && window.__petWander(" + on + ")");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setMode(final String m) {
+            if (!"quiet".equals(m) && !"normal".equals(m) && !"active".equals(m)) return;
+            ui.post(new Runnable() {
+                public void run() {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, m).apply();
+                    js("window.__petSetMode && window.__petSetMode('" + m + "')");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setToggle(final String key, final boolean on) {
+            ui.post(new Runnable() {
+                public void run() {
+                    SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+                    if ("voice".equals(key)) e.putString("input_mode", on ? "voice" : "text");
+                    else if ("speech".equals(key)) e.putBoolean("speech_enabled", on);
+                    else if ("sfx".equals(key)) e.putBoolean("sfx_enabled", on);
+                    else if ("link".equals(key)) e.putBoolean("link_enabled", on);
+                    else return;
+                    e.apply();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void openChatPanel() {
+            ui.post(new Runnable() {
+                public void run() {
+                    closePerfListInternal();
+                    openChat();
+                }
+            });
+        }
+
+        /** 设置卡片跟着桌宠走：网页每 300ms 取一次实时矩形 */
+        @JavascriptInterface
+        public String petRect() {
+            try {
+                JSONObject o = new JSONObject();
+                o.put("x", params.x); o.put("y", params.y);
+                o.put("w", params.width); o.put("h", params.height);
+                o.put("sw", screenW); o.put("sh", screenH);
+                return o.toString();
+            } catch (Throwable t) { return "{}"; }
+        }
 
         @JavascriptInterface
         public void setScaleStart() {
@@ -1259,6 +1496,7 @@ public class PetService extends Service {
         if (link != null) { link.stop(); link = null; }
         if (screenRx != null) { try { unregisterReceiver(screenRx); } catch (Throwable ignored) { } screenRx = null; }
         ui.removeCallbacksAndMessages(null);
+        closePerfListInternal();
         if (petView != null) {
             try { wm.removeView(petView); } catch (Throwable ignored) { }
             petView = null;

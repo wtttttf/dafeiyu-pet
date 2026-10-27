@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>大肥鱼设置</title>
+<style>
+  :root{--ink:#1e2a44;--blue:#2c4bff;--muted:#8b97b3;--line:#e6ecf8;--card:#f6f9ff;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;}
+  #dim{position:fixed;inset:0;background:rgba(8,16,34,.20);opacity:0;
+    transition:opacity .18s ease;z-index:1;}
+  #dim.on{opacity:1;}
+
+  /* 设置气泡：只放条目，窄、可滚动 */
+  #card{position:fixed;left:0;top:0;width:min(44vw,170px);max-height:56vh;
+    transform:translateY(4px);opacity:0;z-index:2;display:flex;flex-direction:column;overflow:hidden;
+    background:var(--card);border-radius:15px;color:var(--ink);
+    box-shadow:0 12px 36px rgba(6,14,30,.34),0 2px 8px rgba(6,14,30,.16);
+    transition:opacity .16s ease,transform .16s ease,left .16s ease,top .16s ease,max-height .16s ease;}
+  #card.on{opacity:1;transform:translateY(0);}
+  header{display:flex;align-items:center;padding:8px 9px 5px;flex:none;}
+  header h1{margin:0;font-size:13.5px;font-weight:700;flex:1;}
+  #close{border:0;background:transparent;color:#9aa4bc;font-size:14px;
+    width:28px;height:28px;border-radius:50%;line-height:28px;padding:0;}
+  #close:active{background:#e9effa;}
+  #body{overflow-y:auto;overflow-x:hidden;padding:0 9px 7px;scrollbar-width:thin;
+    scrollbar-color:#c3cfe6 transparent;}
+  #body::-webkit-scrollbar{width:4px;}
+  #body::-webkit-scrollbar-thumb{background:#c3cfe6;border-radius:4px;}
+  .row{display:flex;align-items:center;gap:6px;min-height:37px;
+    border-top:1px solid var(--line);font-size:12.5px;}
+  .row:first-child{border-top:0;}
+  .row .lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row .val{color:var(--muted);font-size:11px;flex:none;}
+  .row .arrow{color:#b4bfd3;font-size:15px;font-weight:400;flex:none;}
+  .row.opt:active,.row.cat:active,.row.link:active{background:#eef3ff;}
+  .row.link,.row.cat{color:var(--blue);font-weight:600;}
+  .row.danger{color:#d94848;font-weight:600;}
+  .row.danger:active{background:#fff0f0;}
+  .sec-title{color:var(--muted);font-size:10.5px;min-height:24px;border-top:0;padding-top:3px;letter-spacing:.3px;}
+
+  /* 抽屉：控制项 / 表情都塞这里 */
+  #drawer{position:fixed;left:0;top:0;width:min(32vw,130px);max-height:50vh;
+    z-index:3;display:flex;flex-direction:column;overflow:hidden;
+    background:linear-gradient(180deg,#0c1730,#101d3a 60%,#0b1428);
+    color:#e8f0ff;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.5);
+    opacity:0;transform:translateY(4px) scale(.98);pointer-events:none;
+    transition:opacity .16s ease,transform .16s ease,left .16s ease,top .16s ease,max-height .16s ease;}
+  #drawer.on{opacity:1;transform:none;pointer-events:auto;}
+  #dhead{display:flex;align-items:center;padding:8px 9px 5px;flex:none;}
+  #dtitle{margin:0;font-size:12.5px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #dcount{font-size:10px;color:#8fa8d6;margin-right:3px;}
+  #dclose{border:0;background:rgba(255,255,255,.08);color:#c9d9f5;font-size:12px;
+    width:24px;height:24px;border-radius:50%;line-height:24px;padding:0;flex:none;}
+  #dbody{flex:1;overflow-y:auto;padding:0 8px 10px;scrollbar-width:thin;
+    scrollbar-color:rgba(122,168,255,.35) transparent;}
+  #dbody::-webkit-scrollbar{width:4px;}
+  #dbody::-webkit-scrollbar-thumb{background:rgba(122,168,255,.35);border-radius:4px;}
+  .item{display:block;width:100%;box-sizing:border-box;margin-top:5px;border:1px solid rgba(122,168,255,.16);
+    background:rgba(255,255,255,.055);color:#d7e5ff;font-size:11px;line-height:1.2;
+    padding:8px 8px;border-radius:9px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .item:active{background:rgba(122,168,255,.24);}
+
+  .ctl{display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 0 4px;}
+  .bigval{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;color:#fff;}
+  .ctlrow{display:flex;gap:8px;}
+  .bigbtn{width:42px;height:34px;border:1px solid rgba(122,168,255,.28);border-radius:10px;
+    background:rgba(122,168,255,.1);color:#cfe0ff;font-size:18px;line-height:32px;padding:0;}
+  .bigbtn:active{background:rgba(122,168,255,.28);}
+  .hint{font-size:10.5px;color:#8fa8d6;text-align:center;line-height:1.5;}
+  .sw{position:relative;width:44px;height:26px;}
+  .sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;}
+  .sw i{position:absolute;inset:0;border-radius:999px;background:#2a3a5c;transition:background .16s;}
+  .sw i:after{content:"";position:absolute;width:20px;height:20px;border-radius:50%;
+    left:3px;top:3px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .16s;}
+  .sw input:checked + i{background:var(--blue);}
+  .sw input:checked + i:after{transform:translateX(18px);}
+  .modebtn{width:100%;margin-top:6px;border:1px solid rgba(122,168,255,.22);border-radius:9px;
+    background:rgba(255,255,255,.05);color:#c9d9f5;font-size:11.5px;padding:8px 6px;}
+  .modebtn.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+</style>
+</head>
+<body>
+<div id="dim"></div>
+<aside id="card" aria-label="大肥鱼设置">
+  <header><h1>设置</h1><button id="close" aria-label="关闭">&#x2715;</button></header>
+  <div id="body">
+    <div class="row opt" data-opt="scale"><span class="lbl">大小</span><span class="val" id="v_scale">1.0×</span><span class="arrow">›</span></div>
+    <div class="row opt" data-opt="wander"><span class="lbl">自动走动</span><span class="val" id="v_wander">开</span><span class="arrow">›</span></div>
+    <div class="row opt" data-opt="mode"><span class="lbl">活跃度</span><span class="val" id="v_mode">正常</span><span class="arrow">›</span></div>
+    <div class="row opt" data-opt="voice"><span class="lbl">语音输入</span><span class="val" id="v_voice">关</span><span class="arrow">›</span></div>
+    <div class="row opt" data-opt="speech"><span class="lbl">气泡说话</span><span class="val" id="v_speech">开</span><span class="arrow">›</span></div>
+    <div class="row opt" data-opt="sfx"><span class="lbl">音效</span><span class="val" id="v_sfx">开</span><span class="arrow">›</span></div>
+    <div class="row opt" data-opt="link"><span class="lbl">DSH 联动</span><span class="val" id="v_link">关</span><span class="arrow">›</span></div>
+    <div class="row link" id="chatRow"><span class="lbl">和大肥鱼说话</span><span class="arrow">›</span></div>
+    <div class="sec-title">表情</div>
+    <div id="cats"></div>
+    <div class="row danger" id="closePet"><span class="lbl">关闭大肥鱼</span></div>
+  </div>
+</aside>
+
+<aside id="drawer" aria-label="抽屉">
+  <div id="dhead"><h2 id="dtitle">设置</h2><span id="dcount"></span>
+    <button id="dclose" aria-label="收起">&#x2715;</button></div>
+  <div id="dbody"></div>
+</aside>
+
+<script>
+(function () {
+  'use strict';
+  var D = null, card = document.getElementById('card'), dim = document.getElementById('dim');
+  var drawer = document.getElementById('drawer'), dbody = document.getElementById('dbody');
+  var dtitle = document.getElementById('dtitle'), dcount = document.getElementById('dcount');
+  var poll = null, drawerOn = false, busy = false;
+
+  var OPTS = {
+    wander: { label: '自动走动', hint: '自己在桌面随机溜达' },
+    voice:  { label: '语音输入', hint: '关 = 聊天默认文字' },
+    speech: { label: '气泡说话', hint: '关 = 不冒气泡，省电' },
+    sfx:    { label: '音效',     hint: '点击 / 思考 / 完成' },
+    link:   { label: 'DSH 联动', hint: '改完重启桌宠生效' }
+  };
+  var MODES = { quiet: '安静', normal: '正常', active: '活跃' };
+
+  function B() { return window.AndroidBridge || null; }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function petCss() {
+    var sw = (D && D.screen && D.screen.w) || 1080;
+    var k = window.innerWidth / sw;
+    var p = (D && D.pet) || {x:0,y:0,w:0,h:0};
+    return { x: p.x * k, y: p.y * k, w: p.w * k, h: p.h * k };
+  }
+  function overlap(a, b) {
+    return a.l < b.x + b.w && a.l + a.w > b.x && a.t < b.y + b.h && a.t + a.h > b.y;
+  }
+
+  /* 气泡：优先上方/下方，放不下再侧边；避开桌宠、夹在屏幕内 */
+  function placeCard() {
+    if (!D) return;
+    var sw = window.innerWidth, sh = window.innerHeight;
+    var p = petCss(), gap = 8;
+    var cw = card.offsetWidth || 160;
+    var maxH = Math.min(sh * 0.56, 520);
+    card.style.maxHeight = maxH + 'px';
+    var ch = card.offsetHeight || 200;
+    var above = p.y - gap, below = sh - (p.y + p.h) - gap;
+    var left, top, maxHeight;
+    if (above >= Math.min(ch, 190)) {
+      maxHeight = Math.min(maxH, above);
+      card.style.maxHeight = maxHeight + 'px';
+      ch = card.offsetHeight;
+      top = Math.max(6, p.y - ch - gap);
+      left = clamp(p.x + p.w / 2 - cw / 2, 6, sw - cw - 6);
+    } else if (below >= Math.min(ch, 190)) {
+      maxHeight = Math.min(maxH, below);
+      card.style.maxHeight = maxHeight + 'px';
+      ch = card.offsetHeight;
+      top = Math.min(sh - ch - 6, p.y + p.h + gap);
+      left = clamp(p.x + p.w / 2 - cw / 2, 6, sw - cw - 6);
+    } else {
+      var rightRoom = sw - (p.x + p.w) - gap, leftRoom = p.x - gap;
+      maxHeight = maxH;
+      card.style.maxHeight = maxHeight + 'px';
+      ch = card.offsetHeight;
+      left = (rightRoom >= cw || rightRoom >= leftRoom) ? p.x + p.w + gap : p.x - cw - gap;
+      left = clamp(left, 6, sw - cw - 6);
+      top = clamp(p.y + p.h / 2 - ch / 2, 6, sh - ch - 6);
+    }
+    card.style.left = Math.round(left) + 'px';
+    card.style.top = Math.round(top) + 'px';
+    if (drawerOn) placeDrawer();
+  }
+
+  /* 抽屉：贴在气泡旁边（桌宠反方向），不压气泡、不压桌宠、不出屏 */
+  function placeDrawer() {
+    if (!D || !drawerOn) return;
+    var sw = window.innerWidth, sh = window.innerHeight;
+    var p = petCss(), gap = 8;
+    var cw = card.offsetWidth, ch = card.offsetHeight;
+    var dw = drawer.offsetWidth || 120;
+    var cl = parseFloat(card.style.left) || 0, ct = parseFloat(card.style.top) || 0;
+    var petCenter = p.x + p.w / 2;
+    var cand = petCenter > sw / 2
+      ? [{ l: cl - dw - gap, t: ct }, { l: cl + cw + gap, t: ct }]
+      : [{ l: cl + cw + gap, t: ct }, { l: cl - dw - gap, t: ct }];
+    var cardRect = { l: cl, t: ct, w: cw, h: ch };
+    var picked = null;
+    for (var i = 0; i < cand.length; i++) {
+      var r = { l: cand[i].l, t: cand[i].t, w: dw, h: Math.min(ch, 360) };
+      if (r.l < 6 || r.l + dw > sw - 6) continue;
+      if (overlap(r, p)) continue;
+      if (overlap(r, cardRect)) continue;
+      picked = r; break;
+    }
+    if (!picked) {
+      var l = clamp(cand[0].l, 6, sw - dw - 6);
+      picked = { l: l, t: ct, w: dw, h: Math.min(ch, 360) };
+    }
+    var maxH = Math.max(120, Math.min(picked.h, sh - picked.t - 6));
+    drawer.style.maxHeight = maxH + 'px';
+    drawer.style.left = Math.round(picked.l) + 'px';
+    drawer.style.top = Math.round(picked.t) + 'px';
+  }
+
+  function refreshPet() {
+    var b = B();
+    if (b && b.petRect) { try { D.pet = JSON.parse(b.petRect()); } catch (e) {} }
+    placeCard();
+  }
+
+  function setVal(id, text) { var n = document.getElementById(id); if (n) n.textContent = text; }
+  function refreshVals() {
+    var s = D.settings || {};
+    setVal('v_scale', (Math.round((s.scale || 1) * 10) / 10).toFixed(1) + '×');
+    setVal('v_wander', s.wander ? '开' : '关');
+    setVal('v_mode', MODES[s.mode] || '正常');
+    setVal('v_voice', s.voice ? '语音' : '文字');
+    setVal('v_speech', s.speech ? '开' : '关');
+    setVal('v_sfx', s.sfx ? '开' : '关');
+    setVal('v_link', s.link ? '开' : '关');
+  }
+
+  function renderCats(cats) {
+    var box = document.getElementById('cats');
+    box.innerHTML = '';
+    for (var i = 0; i < cats.length; i++) {
+      (function (cat, idx) {
+        var row = el('div', 'row cat');
+        row.appendChild(el('span', 'lbl', cat.name));
+        row.appendChild(el('span', 'val', cat.items.length));
+        row.appendChild(el('span', 'arrow', '›'));
+        row.addEventListener('click', function () { openCat(idx); });
+        box.appendChild(row);
+      })(cats[i], i);
+    }
+  }
+
+  function showDrawer(title, count) {
+    drawerOn = true;
+    dtitle.textContent = title;
+    dcount.textContent = count || '';
+    dbody.innerHTML = '';
+    drawer.classList.add('on');
+    placeDrawer();
+  }
+
+  function openCat(i) {
+    if (!D || !D.categories || !D.categories[i]) return;
+    var cat = D.categories[i];
+    showDrawer(cat.name, cat.items.length + ' 段');
+    for (var j = 0; j < cat.items.length; j++) {
+      (function (name) {
+        var b = el('button', 'item', name);
+        b.addEventListener('click', function () {
+          if (busy) return; busy = true;
+          var br = B(); if (br && br.playPerf) br.playPerf(name);
+        });
+        dbody.appendChild(b);
+      })(cat.items[j]);
+    }
+    dbody.scrollTop = 0;
+  }
+
+  function openOpt(key) {
+    if (!D) return;
+    var s = D.settings || (D.settings = {});
+    showDrawer(key === 'scale' ? '大小' : key === 'mode' ? '活跃度' : OPTS[key].label, '');
+    if (key === 'scale') {
+      var wrap = el('div', 'ctl');
+      var val = el('div', 'bigval', (Math.round((s.scale || 1) * 10) / 10).toFixed(1) + '×');
+      var row = el('div', 'ctlrow');
+      var minus = el('button', 'bigbtn', '−'), plus = el('button', 'bigbtn', '+');
+      minus.addEventListener('click', function () {
+        var v = Math.max(0.5, Math.round(((s.scale || 1) - 0.1) * 10) / 10);
+        s.scale = v; val.textContent = v.toFixed(1) + '×'; refreshVals();
+        var b = B(); if (b && b.setScale) b.setScale(v);
+      });
+      plus.addEventListener('click', function () {
+        var v = Math.min(3, Math.round(((s.scale || 1) + 0.1) * 10) / 10);
+        s.scale = v; val.textContent = v.toFixed(1) + '×'; refreshVals();
+        var b = B(); if (b && b.setScale) b.setScale(v);
+      });
+      row.appendChild(minus); row.appendChild(plus);
+      wrap.appendChild(val); wrap.appendChild(row);
+      dbody.appendChild(wrap);
+    } else if (key === 'mode') {
+      var keys = ['quiet', 'normal', 'active'];
+      for (var i = 0; i < keys.length; i++) {
+        (function (m) {
+          var b = el('button', 'modebtn' + (s.mode === m ? ' on' : ''), MODES[m]);
+          b.addEventListener('click', function () {
+            s.mode = m; refreshVals();
+            dbody.querySelectorAll('.modebtn').forEach(function (x) { x.classList.toggle('on', x.textContent === MODES[m]); });
+            var br = B(); if (br && br.setMode) br.setMode(m);
+          });
+          dbody.appendChild(b);
+        })(keys[i]);
+      }
+    } else {
+      var def = OPTS[key];
+      var wrap2 = el('div', 'ctl');
+      wrap2.appendChild(el('div', 'hint', def.hint));
+      var sw = el('span', 'sw');
+      var inp = document.createElement('input'); inp.type = 'checkbox';
+      inp.checked = key === 'voice' ? !!s.voice : !!s[key];
+      inp.addEventListener('change', function () {
+        s[key] = inp.checked; refreshVals();
+        var br = B(); if (br && br.setToggle) br.setToggle(key, inp.checked);
+      });
+      sw.appendChild(inp); sw.appendChild(document.createElement('i'));
+      wrap2.appendChild(sw);
+      dbody.appendChild(wrap2);
+    }
+  }
+
+  function closeDrawer() {
+    drawerOn = false;
+    drawer.classList.remove('on');
+  }
+
+  window.settingsRender = function (d) {
+    D = d || {settings:{}, categories:[]};
+    refreshVals();
+    renderCats(D.categories || []);
+    requestAnimationFrame(function () {
+      dim.classList.add('on'); card.classList.add('on');
+      placeCard();
+    });
+    if (poll) clearInterval(poll);
+    poll = setInterval(refreshPet, 300);
+  };
+
+  document.querySelectorAll('.row.opt').forEach(function (row) {
+    row.addEventListener('click', function () { openOpt(row.dataset.opt); });
+  });
+  document.getElementById('chatRow').addEventListener('click', function () {
+    var b = B(); if (b && b.openChatPanel) b.openChatPanel();
+  });
+  document.getElementById('closePet').addEventListener('click', function () {
+    var b = B(); if (b && b.closePet) b.closePet();
+  });
+  document.getElementById('dclose').addEventListener('click', closeDrawer);
+
+  function closeAll() {
+    if (busy) return; busy = true;
+    if (poll) clearInterval(poll);
+    dim.classList.remove('on'); card.classList.remove('on'); closeDrawer();
+    setTimeout(function () { var b = B(); if (b && b.closeSettings) b.closeSettings(); }, 140);
+  }
+  document.getElementById('close').addEventListener('click', closeAll);
+  dim.addEventListener('click', function () {
+    if (drawerOn) { closeDrawer(); return; }
+    closeAll();
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>表演列表</title>
+<style>
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:transparent;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+    font-family:-apple-system,"PingFang SC","Noto Sans CJK SC",sans-serif;}
+  #dim{position:fixed;inset:0;background:rgba(2,6,16,.52);opacity:0;
+    transition:opacity .22s ease;z-index:1;}
+  #dim.on{opacity:1;}
+  #drawer{position:fixed;top:0;right:0;bottom:0;width:86%;max-width:520px;z-index:2;
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#0c1730 0%,#101d3a 58%,#0b1428 100%);
+    color:#e8f0ff;border-radius:24px 0 0 24px;
+    box-shadow:-10px 0 46px rgba(0,0,0,.55);
+    transform:translateX(102%);
+    transition:transform .26s cubic-bezier(.2,.82,.25,1);
+    padding-top:calc(env(safe-area-inset-top) + 20px);
+    padding-bottom:env(safe-area-inset-bottom);}
+  #drawer.on{transform:translateX(0);}
+  header{display:flex;align-items:flex-start;padding:0 18px 12px;}
+  .ttl-wrap{flex:1;min-width:0;}
+  h1{margin:0;font-size:21px;font-weight:700;letter-spacing:.5px;line-height:1.2;}
+  #count{font-size:12.5px;font-weight:400;color:#8fa8d6;margin-left:6px;}
+  .sub{margin-top:5px;font-size:12px;color:#7d93bd;line-height:1.4;}
+  #close{width:36px;height:36px;border:0;border-radius:50%;flex:none;margin-left:8px;
+    background:rgba(255,255,255,.08);color:#c9d9f5;font-size:17px;line-height:36px;
+    padding:0;text-align:center;}
+  #close:active{background:rgba(255,255,255,.16);}
+  .chips{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;padding:2px 18px 12px;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{flex:none;border:1px solid rgba(122,168,255,.22);background:rgba(122,168,255,.08);
+    color:#a9c4ee;font-size:12.5px;padding:6px 12px;border-radius:999px;white-space:nowrap;}
+  .chip:active{background:rgba(122,168,255,.2);color:#e8f0ff;}
+  #list{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 14px 28px;
+    -webkit-overflow-scrolling:touch;scroll-padding-top:6px;}
+  .sec{margin-top:14px;}
+  .sec:first-child{margin-top:2px;}
+  .sec-h{display:flex;align-items:baseline;margin:0 4px 9px;font-size:14px;
+    font-weight:600;color:#cfe0fb;letter-spacing:.4px;}
+  .sec-n{margin-left:7px;font-size:11.5px;font-weight:400;color:#7189b3;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .item{position:relative;border:1px solid rgba(122,168,255,.16);
+    background:rgba(255,255,255,.055);color:#d7e5ff;
+    font-size:13px;line-height:1.25;padding:11px 12px;border-radius:12px;text-align:left;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    transition:background .15s,transform .12s;}
+  .item:active{background:rgba(122,168,255,.24);transform:scale(.97);}
+  .empty{margin:40px 20px;text-align:center;color:#7189b3;font-size:13px;line-height:1.8;}
+</style>
+</head>
+<body>
+<div id="dim"></div>
+<aside id="drawer" aria-label="表演列表">
+  <header>
+    <div class="ttl-wrap">
+      <h1>表演列表<span id="count"></span></h1>
+      <div class="sub">点名字就让大肥鱼演一次 · 随机表演 10 次内不重复</div>
+    </div>
+    <button id="close" aria-label="关闭">&#x2715;</button>
+  </header>
+  <div class="chips" id="chips"></div>
+  <div id="list"><div class="empty">加载中…</div></div>
+</aside>
+<script>
+(function () {
+  'use strict';
+  var drawer = document.getElementById('drawer');
+  var dim = document.getElementById('dim');
+  var listEl = document.getElementById('list');
+  var chipsEl = document.getElementById('chips');
+  var countEl = document.getElementById('count');
+  var busy = false;
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function play(name) {
+    if (busy || !(window.AndroidBridge && AndroidBridge.playPerf)) return;
+    busy = true;
+    dim.classList.remove('on');
+    drawer.classList.remove('on');
+    setTimeout(function () { AndroidBridge.playPerf(name); }, 170);
+  }
+
+  function close() {
+    if (busy) return;
+    busy = true;
+    dim.classList.remove('on');
+    drawer.classList.remove('on');
+    setTimeout(function () {
+      if (window.AndroidBridge && AndroidBridge.closePerf) AndroidBridge.closePerf();
+    }, 170);
+  }
+
+  document.getElementById('close').addEventListener('click', close);
+  dim.addEventListener('click', close);
+
+  window.perfRender = function (data) {
+    if (!data || !data.categories || !data.categories.length) {
+      listEl.innerHTML = '';
+      listEl.appendChild(el('div', 'empty', '没有可表演的素材'));
+      return;
+    }
+    countEl.textContent = ' · ' + data.total + ' 段';
+    chipsEl.innerHTML = '';
+    listEl.innerHTML = '';
+    for (var i = 0; i < data.categories.length; i++) {
+      (function (cat, idx) {
+        var chip = el('button', 'chip', cat.name + ' ' + cat.items.length);
+        chip.addEventListener('click', function () {
+          var sec = document.getElementById('sec-' + idx);
+          if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        chipsEl.appendChild(chip);
+
+        var sec = el('section', 'sec');
+        sec.id = 'sec-' + idx;
+        var h = el('h3', 'sec-h', cat.name);
+        h.appendChild(el('span', 'sec-n', cat.items.length + ' 段'));
+        sec.appendChild(h);
+        var grid = el('div', 'grid');
+        for (var j = 0; j < cat.items.length; j++) {
+          (function (name) {
+            var b = el('button', 'item', name);
+            b.addEventListener('click', function () { play(name); });
+            grid.appendChild(b);
+          })(cat.items[j]);
+        }
+        sec.appendChild(grid);
+        listEl.appendChild(sec);
+      })(data.categories[i], i);
+    }
+    requestAnimationFrame(function () {
+      dim.classList.add('on');
+      drawer.classList.add('on');
+    });
+  };
+})();
+</script>
+</body>
+</html>

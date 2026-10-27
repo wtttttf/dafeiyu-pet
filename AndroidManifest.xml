@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.dafeiyu.pet"
-    android:versionCode="122"
-    android:versionName="1.2.2">
+    android:versionCode="129"
+    android:versionName="1.2.9">
 
     <!-- Android 11+ 包可见性：不看声明就看不到系统语音识别服务 -->
     <queries>

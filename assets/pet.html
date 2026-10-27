@@ -40,10 +40,11 @@
       opacity:0;transition:opacity .22s,transform .22s;pointer-events:none;z-index:40;}
   .bubble.show{opacity:1;transform:translateX(-50%) translateY(0);}
   #acts{position:fixed;left:50%;bottom:3.3vw;transform:translateX(-50%) scale(.9);
-      display:flex;gap:2.9vw;opacity:0;pointer-events:none;
+      display:flex;flex-direction:column;align-items:center;gap:2vw;opacity:0;pointer-events:none;
       transition:opacity .2s,transform .2s;z-index:41;}
   #acts.open{opacity:1;transform:translateX(-50%) scale(1);pointer-events:auto;}
-  .act{width:16.7vw;height:16.7vw;border-radius:50%;border:0;padding:0;font-size:7.9vw;
+  .actrow{display:flex;gap:2vw;justify-content:center;}
+  .act{width:14vw;height:14vw;border-radius:50%;border:0;padding:0;font-size:6.5vw;
       background:rgba(255,255,255,.92);box-shadow:0 .8vw 3.3vw rgba(0,0,0,.28);}
 </style>
 </head>
@@ -55,14 +56,37 @@
 </div>
 <div class="bubble" id="bubble"></div>
 <div id="acts">
-  <button class="act" data-c="eat" title="投喂">&#x1F35C;</button>
-  <button class="act" data-c="dance" title="跳舞">&#x1F495;</button>
-  <button class="act" data-c="sleep" title="睡觉">&#x1F4A4;</button>
+  <div class="actrow">
+    <button class="act" data-c="eat" title="吃白饭">&#x1F35A;</button>
+    <button class="act" data-c="dance" title="爱心">&#x1F495;</button>
+    <button class="act" data-c="sleep" title="睡觉">&#x1F4A4;</button>
+  </div>
+  <div class="actrow">
+    <button class="act" data-c="settings" title="设置">&#x2699;&#xFE0F;</button>
+    <button class="act" data-c="random" title="随机表情">&#x1F3B2;</button>
+  </div>
 </div>
 <script>
 (function () {
   'use strict';
   var CLIPS   = {"idle": ["待机呼吸休闲", "悠闲哼歌", "碎碎念-发呆碎碎念", "哈欠连天", "深度思考碎碎念", "照镜子"], "turn": ["东张西望"], "drag": ["被鼠标拖拽悬空反馈"], "moves": ["原地左转奔跑", "原地漂浮踏步", "螃蟹走路"], "clicks": ["点击回应-傲娇生气", "点击回应-元气挥手", "点击回应-害羞惊讶", "点击回应-开心跃动", "点击回应-挠痒咯咯笑", "被吓一跳", "打瞌睡被惊醒", "摇扇纳凉"], "balance": ["余额-分文不剩", "余额-数金皱眉", "余额-袋空如洗", "余额-金袋叮当", "余额-钱袋如常", "余额-钱袋满溢"], "random": ["三球抛接", "下五子棋", "中秋赏月吃月饼", "优雅女仆舞", "偷吃零食被抓住", "写代码", "写福字", "凭空生花", "动物环绕", "原地专心玩魔方", "原地小憩沉眠", "原地敲击桌面互动", "原地跳跃抓碎头顶物品", "原地蹲下玩玩具汽车", "原地重力下蹲压缩", "变鸽子", "可爱宅舞", "吃Token", "吃冰淇淋融化", "吃午餐", "吃大闸蟹", "吃年糕", "吃早餐", "吃晚餐", "吃汤圆", "吃白饭", "吃粽子", "吃糖葫芦", "吃腊八粥", "吃西瓜", "吃重阳糕", "吃长寿面", "吃青团", "吃饺子", "吹气球", "吹笛子", "堆雪人", "大口吃零食", "女仆屈膝礼仪", "小幅度原地360度旋转展示", "小提琴演奏", "工作状态-原地踱步张望", "工作状态-垂头叹气冒汗", "工作状态-忙碌点按", "工作状态-思考冒泡", "工作状态-清点归档", "工作状态-雀跃庆祝", "扑克魔术", "抽陀螺", "拆礼物", "插茱萸赏菊", "撸猫", "收红包", "放孔明灯", "放河灯", "放烟花", "放风筝", "整体换装试色", "是啊，吃什么", "晨间刷牙", "涮火锅", "玩水枪", "玩游戏气急败坏", "用鲸鱼尾巴拍打地面", "碎碎念-对屏碎碎念", "碎碎念-擦桌碎碎念", "穿针乞巧", "舞狮头", "荡秋千", "萌化小幽灵", "蓝鲸现世", "蝴蝶蜜蜂环绕头顶开花", "被落叶淹没", "装点圣诞树", "讨糖南瓜灯", "超大伸懒腰", "踢毽子", "轻快摇摆舞", "轻快记录", "骑木马", "鲸鱼吐泡泡特效"]};
+  /* 这两段原来被当走路用，实际是 转身→趴下→睡 / 转身→爬→躺；
+     归回表情池，走路只用 "原地漂浮踏步"。 */
+  CLIPS.random.push("原地左转奔跑", "螃蟹走路");
+  /* 表演池分类：只列可表演的 81 段（CLIPS.random）；走路、待机、点击回应、余额动画不进来。
+     分类里写漏的名字会落到「其他」，所以不会丢素材。 */
+  var PERF_CATS = [
+    { name: "干饭", items: ["吃Token", "吃冰淇淋融化", "吃午餐", "吃大闸蟹", "吃年糕", "吃早餐", "吃晚餐", "吃汤圆", "吃白饭", "吃粽子", "吃糖葫芦", "吃腊八粥", "吃西瓜", "吃重阳糕", "吃长寿面", "吃青团", "吃饺子", "大口吃零食", "偷吃零食被抓住", "涮火锅", "是啊，吃什么"] },
+    { name: "节日", items: ["中秋赏月吃月饼", "写福字", "堆雪人", "插茱萸赏菊", "收红包", "放孔明灯", "放河灯", "放烟花", "穿针乞巧", "舞狮头", "装点圣诞树", "讨糖南瓜灯"] },
+    { name: "玩耍", items: ["三球抛接", "下五子棋", "原地专心玩魔方", "原地敲击桌面互动", "原地蹲下玩玩具汽车", "抽陀螺", "拆礼物", "撸猫", "玩水枪", "放风筝", "荡秋千", "踢毽子", "骑木马", "动物环绕"] },
+    { name: "才艺", items: ["写代码", "吹气球", "吹笛子", "小提琴演奏", "扑克魔术", "变鸽子", "凭空生花", "蓝鲸现世", "鲸鱼吐泡泡特效", "轻快记录"] },
+    { name: "搞怪", items: ["玩游戏气急败坏", "用鲸鱼尾巴拍打地面", "萌化小幽灵", "蝴蝶蜜蜂环绕头顶开花", "被落叶淹没", "原地跳跃抓碎头顶物品", "原地重力下蹲压缩", "晨间刷牙"] },
+    { name: "动作", items: ["原地左转奔跑", "螃蟹走路"] },
+    { name: "舞蹈", items: ["优雅女仆舞", "可爱宅舞", "轻快摇摆舞", "小幅度原地360度旋转展示", "女仆屈膝礼仪", "整体换装试色"] },
+    { name: "工作", items: ["工作状态-原地踱步张望", "工作状态-垂头叹气冒汗", "工作状态-忙碌点按", "工作状态-思考冒泡", "工作状态-清点归档", "工作状态-雀跃庆祝"] },
+    { name: "碎碎念", items: ["碎碎念-对屏碎碎念", "碎碎念-擦桌碎碎念"] },
+    { name: "休息", items: ["原地小憩沉眠", "超大伸懒腰"] }
+  ];
   var FIT     = {"动物环绕": 0.754, "吃Token": 0.972, "吃晚餐": 0.788, "是啊，吃什么": 0.963, "蝴蝶蜜蜂环绕头顶开花": 0.539};       // 超出裁剪框的片段：整页缩放显示，保证元素完整
   var STRIDES = {"原地左转奔跑": 240, "原地漂浮踏步": 90, "螃蟹走路": 220};
   var CURVES  = {"原地左转奔跑": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0034, 0.0508, 0.1186, 0.1864, 0.2542, 0.322, 0.3898, 0.4576, 0.5254, 0.5932, 0.661, 0.7288, 0.7966, 0.8644, 0.9322, 0.9898, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], "原地漂浮踏步": [0.0, 0.0, 0.0, 0.0058, 0.024, 0.0433, 0.0625, 0.0817, 0.101, 0.1202, 0.1394, 0.1587, 0.1779, 0.1971, 0.2163, 0.2356, 0.2548, 0.274, 0.2933, 0.3125, 0.3317, 0.351, 0.3702, 0.3894, 0.4087, 0.4279, 0.4471, 0.4663, 0.4856, 0.5048, 0.524, 0.5433, 0.5625, 0.5817, 0.601, 0.6202, 0.6394, 0.6587, 0.6779, 0.6971, 0.7163, 0.7356, 0.7548, 0.774, 0.7933, 0.8125, 0.8317, 0.851, 0.8702, 0.8894, 0.9087, 0.9279, 0.9471, 0.9663, 0.9856, 0.999, 1.0, 1.0, 1.0, 1.0, 1.0], "螃蟹走路": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0071, 0.0296, 0.0533, 0.0769, 0.1006, 0.1243, 0.1479, 0.1716, 0.1953, 0.2189, 0.2426, 0.2663, 0.2899, 0.3136, 0.3373, 0.3609, 0.3846, 0.4083, 0.432, 0.4556, 0.4793, 0.503, 0.5266, 0.5503, 0.574, 0.5976, 0.6213, 0.645, 0.6686, 0.6923, 0.716, 0.7396, 0.7633, 0.787, 0.8107, 0.8343, 0.858, 0.8817, 0.9053, 0.929, 0.9527, 0.9763, 0.9964, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]};
@@ -91,6 +115,17 @@
     return { l: l, r: r, t: t, b: b };
   }
 
+  /* 桌球用固定包围盒：甩的过程中会换跑/漂片段，按当前片段算边界会让墙忽远忽近 */
+  function flingMargins(W, H) {
+    var cw = CROP[2] - CROP[0], ch = CROP[3] - CROP[1];
+    return {
+      l: Math.max(0, (BODY[0] - CROP[0]) / cw) * W,
+      r: Math.max(0, (CROP[2] - BODY[2]) / cw) * W,
+      t: Math.max(0, (BODY[1] - CROP[1]) / ch) * H,
+      b: Math.max(0, (CROP[3] - BODY[3]) / ch) * H
+    };
+  }
+
   var bridge = window.AndroidBridge || {};
   var vs = [document.getElementById('va'), document.getElementById('vb')];
   var stage = document.getElementById('stage');
@@ -116,6 +151,27 @@
   function url(name) { return 'webm/' + encodeURIComponent(name) + '.webm'; }
   function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 
+  /* ---------- 随机表演池：任意连续 10 次里不出现重复 ----------
+     PERF_GAP=9：抽之前把最近 9 次从候选里剔掉，所以第 1 次和第 10 次才可能撞。
+     手动点列表也会记进历史（notePerf），但不受"最近 9 次"限制 —— 那是用户自己的选择。 */
+  var PERF_GAP = 9;
+  var perfHist = [];
+  function notePerf(n) {
+    if (!n) return;
+    perfHist.push(n);
+    if (perfHist.length > 400) perfHist = perfHist.slice(-200);
+  }
+  function pickPerf(pool) {
+    if (!pool || !pool.length) return null;
+    var gap = Math.min(PERF_GAP, Math.max(0, pool.length - 1));
+    var recent = gap > 0 ? perfHist.slice(-gap) : [];
+    var cand = pool.filter(function (n) { return recent.indexOf(n) < 0; });
+    if (!cand.length) cand = pool.slice();
+    var n = cand[Math.floor(Math.random() * cand.length)];
+    notePerf(n);
+    return n;
+  }
+
   /* ---------- 双缓冲交叉淡化 ----------
      连点闪灰框的根子：只要在「某个 video 还看得见」的时候去动它的 src，
      它就会瞬间失去画面 → 露一个还没渲染出内容的空块。两种触法：
@@ -126,11 +182,20 @@
        B. 只有在元素「既不是前台、又不在淡出窗口里」时才给它赋 src。
      再配一条兜底：淡出结束后 .pv 会切到 visibility:hidden，彻底不参与绘制。 */
   // 朝向/透视：mirror 用于向右跑（把朝左的片段水平翻转），scale 用于"远离/靠近"的透视感
-  function setStagePose(mirror, k) {
+  function setStagePose(mirror, k, instant) {
     var el = document.getElementById('stage');
     if (!el) return;
     var t = (mirror ? 'scaleX(-1) ' : '') + ((k && k !== 1) ? ('scale(' + k + ')') : '');
-    el.style.transform = t;
+    if (instant) {
+      /* 走路换向要"先镜像、再出动画、再位移"：镜像本身不做 280ms 过渡 */
+      var old = el.style.transition;
+      el.style.transition = 'none';
+      el.style.transform = t;
+      void el.offsetWidth;
+      requestAnimationFrame(function () { el.style.transition = old || ''; });
+    } else {
+      el.style.transform = t;
+    }
   }
   function play(name, opt) {
     opt = opt || {};
@@ -228,7 +293,10 @@
       var afterFirst = function () {
         firstFrame();
         if (opt.waitTime) armWait(startMove);
-        else startMove();
+        else {
+          /* 等首帧真的画上去再走，避免"窗口先动、动画后到" */
+          requestAnimationFrame(function () { requestAnimationFrame(startMove); });
+        }
       };
       if (back.requestVideoFrameCallback) { try { back.requestVideoFrameCallback(afterFirst); } catch (e) {} }
       setTimeout(afterFirst, 140);
@@ -303,14 +371,14 @@
      ↓ 向下（朝观众）：原地漂浮踏步（正面）
      ↑ 向上（远离）：正面片段 + 缩到 0.9 做透视（素材里没有真正的背面走路） */
   function pickMove(dx, dy) {
-    var adx = Math.abs(dx), ady = Math.abs(dy);
-    if (adx >= ady) {
-      /* 原地跑片段没有真实位移，按曲线推进会"走一下停一下"；
-         桌面宠的通行做法就是匀速滑动 + 跑步动画循环。 */
-      return { name: "原地左转奔跑", mirror: dx > 0, scale: 1, speed: 150 };
-    }
-    if (dy > 0) return { name: "原地漂浮踏步", mirror: false, scale: 1, speed: 340 };
-    return { name: "原地漂浮踏步", mirror: false, scale: 0.9, speed: 300 };
+    /* 【重要】106 段素材里没有真正的走路循环：
+       "原地左转奔跑" 实际是 转身→趴下→睡→醒（10s），
+       "螃蟹走路" 是 转身→爬→躺，只有 "原地漂浮踏步" 是持续上下浮。
+       拿前两个当走路会出现"走着走着躺下"。鲸鱼娘本来就是浮着的，
+       所以移动统一用漂浮片段做滑行，速度按距离算，不做假跨步。 */
+    var up = Math.abs(dy) > Math.abs(dx) && dy < 0;
+    /* 素材朝左：向左/上/下用原版，向右水平镜像，否则像倒着走 */
+    return { name: "原地漂浮踏步", mirror: dx > 0, scale: up ? 0.9 : 1, speed: 120 };
   }
 
   function walkTo(tx, ty) {
@@ -342,11 +410,11 @@
       var dx2 = tx - X2, dy2 = ty - Y2, dist2 = Math.hypot(dx2, dy2);
       if (!isFinite(dist2) || dist2 < 8) { toIdle(); return; }
       if (mv.speed) {
-        /* 漂浮没有脚接触，直接匀速过去：距离多长都按 speed 换算时长 */
-        var dur = Math.max(1.5, dist2 / (mv.speed * sc));
-        if (!isFinite(dur)) { toIdle(); return; }
+        /* 漂浮是连续循环，不按"整周期"对齐；距离 / 速度就是移动时长 */
+        var dur = Math.max(0.7, dist2 / (mv.speed * sc));
+        if (!isFinite(dur) || dur <= 0) { toIdle(); return; }
         walking = { mode: "linear", ux: dx2 / dist2, uy: dy2 / dist2, dist: dist2, dur: dur,
-                    t0: performance.now() / 1000, x0: X2, y0: Y2 };
+                    smooth: true, t0: performance.now() / 1000, x0: X2, y0: Y2 };
       } else {
         var stride = (STRIDES[mv.name] || 200) * sc;
         var cycles = Math.max(1, Math.min(2, Math.round(dist2 / stride)));
@@ -355,9 +423,10 @@
       }
       requestAnimationFrame(tickWalk);
     };
+    /* 顺序：先镜像/缩放 → 等新片段首帧 → 再开始位移 */
+    setStagePose(mv.mirror, mv.scale || 1, true);
     var horiz = (mv.name === "原地左转奔跑");
     play(mv.name, { loop: true, onStart: begin,
-                    onFirstFrame: function () { setStagePose(mv.mirror, mv.scale || 1); },
                     waitTime: horiz ? 2.2 : 0,
                     seekTo: horiz ? 1.2 : 0 });
     return true;
@@ -403,7 +472,16 @@
     var d, nx, ny;
     if (walking.mode === "linear") {
       var t = (now - walking.t0) / walking.dur;
-      if (t >= 1) { endWalk(); return; }
+      if (t >= 1) {
+        /* 漂浮滑行到点就收；只有"整周期"的跑/走才需要等循环头 */
+        if (walking.smooth) { endWalk(); return; }
+        var vv = vs[fi];
+        if (vv && vv.duration > 0.2 && vv.currentTime > 0.12) {
+          requestAnimationFrame(tickWalk);
+          return;
+        }
+        endWalk(); return;
+      }
       var e = t * t * (3 - 2 * t);            // smoothstep：起步和收尾都软一点
       d = walking.dist * e;
     } else {
@@ -440,7 +518,8 @@
 
     var b = bounds();
     var W = b.w || 0, H = b.h || 0, SW = b.sw || 0, SH = b.sh || 0;
-    var bm = bodyMargins(W, H);
+    /* 桌球用固定包围盒：甩的过程中会换跑/漂片段，按当前片段算边界会让墙忽远忽近 */
+    var bm = flingMargins(W, H);
     var minX = -bm.l, maxX = SW - W + bm.r, minY = -bm.t, maxY = SH - H + bm.b;
 
     var x = fling.x + fling.vx * dt, y = fling.y + fling.vy * dt;
@@ -449,6 +528,9 @@
     if (x > maxX) { x = maxX; fling.vx = -Math.abs(fling.vx) * bounce; fling.hits++; }
     if (y < minY) { y = minY; fling.vy = Math.abs(fling.vy) * bounce; fling.hits++; }
     if (y > maxY) { y = maxY; fling.vy = -Math.abs(fling.vy) * bounce; fling.hits++; }
+    /* 撞完只剩几像素/秒的轴直接停住，别让它贴边抖 */
+    if (Math.abs(fling.vx) < 24) fling.vx = 0;
+    if (Math.abs(fling.vy) < 24) fling.vy = 0;
 
     var drag = Math.exp(-1.15 * dt);        // 空气阻力
     fling.vx *= drag; fling.vy *= drag;
@@ -474,7 +556,7 @@
     }
     if (bridge.setWindowXY) bridge.setWindowXY(x, y); else bridge.setWindowX(x);
 
-    if (sp < 60) {
+    if (sp < 22) {
       fling = null;
       toIdle();
       schedule();
@@ -491,7 +573,7 @@
     var b = bounds();
     fling = { x: b.x || 0, y: b.y || 0, vx: vx, vy: vy,
               last: performance.now() / 1000, dir: "", hits: 0 };
-    setTimeout(function () { if (fling) { fling = null; toIdle(); schedule(); } }, 8000);
+    setTimeout(function () { if (fling) { fling = null; toIdle(); schedule(); } }, 30000);
     requestAnimationFrame(tickFling);
     return true;
   };
@@ -562,7 +644,7 @@
       var r = Math.random() * total;
       window.__dec = window.__dec || { walk: 0, act: 0, talk: 0 };
       if (r < RATES.walk && wanderOn && CLIPS.moves.length) { window.__dec.walk++; walk(); }
-      else if (r < RATES.walk + RATES.act && CLIPS.random.length) { window.__dec.act++; oneShot(pick(CLIPS.random)); }
+      else if (r < RATES.walk + RATES.act && CLIPS.random.length) { window.__dec.act++; oneShot(pickPerf(CLIPS.random)); }
       else if (RATES.talk > 0) { window.__dec.talk++; say(pick(TALK)); }
       schedule();
     }, gap * jitter);
@@ -607,15 +689,28 @@
     actsTimer = setTimeout(function () { actsEl.classList.remove('open'); }, 4500);
   }
 
+  function performRandom() {
+    var n = pickPerf(CLIPS.random);
+    if (n) oneShot(n);
+  }
+
   function runAct(c) {
     actsEl.classList.remove('open');
+    if (c === 'settings' || c === 'list') {
+      if (bridge.openSettingsPanel) bridge.openSettingsPanel();
+      else if (bridge.openPerfList) bridge.openPerfList();
+      else say('设置只能在手机上打开');
+      return;
+    }
+    if (c === 'random') { performRandom(); return; }
     var pool = CLIPS.random;
     var re, line;
     if (c === 'eat') { re = /吃|零食|火锅|饺子|西瓜/; line = '好吃！'; }
     else if (c === 'dance') { re = /舞|摇摆|女仆/; line = '嘿~'; }
     else { re = /小憩|沉眠|哈欠|打瞌睡/; line = '晚安…'; }
     var a = pool.filter(function (n) { return re.test(n); });
-    oneShot(a.length ? pick(a) : pick(pool));
+    var n = pickPerf(a.length ? a : pool);
+    if (n) oneShot(n);
     say(line, 1800);
   }
 
@@ -781,7 +876,24 @@
     }
   };
 
-  window.__petPlay = function (n) { oneShot(n); };   // 调试：强行播某一段
+  window.__petPlay = function (n) {
+    if (!n) return false;
+    if (CLIPS.random.indexOf(n) >= 0) notePerf(n);   // 手动点的也记进历史，随机时避开
+    oneShot(n);
+    return true;
+  };
+  /* 给原生抽屉用的表演数据：分类 + 总数。分类漏掉的名字自动进「其他」。 */
+  window.__perfData = function () {
+    var seen = {}, cats = [];
+    for (var i = 0; i < PERF_CATS.length; i++) {
+      var items = PERF_CATS[i].items.filter(function (n) { return CLIPS.random.indexOf(n) >= 0 && !seen[n]; });
+      for (var j = 0; j < items.length; j++) seen[items[j]] = 1;
+      if (items.length) cats.push({ name: PERF_CATS[i].name, items: items });
+    }
+    var rest = CLIPS.random.filter(function (n) { return !seen[n]; });
+    if (rest.length) cats.push({ name: '其他', items: rest });
+    return { total: CLIPS.random.length, categories: cats };
+  };
   window.__petWalkTo = function (x, y) { return walkTo(x, y); };   // 调试：走到屏幕某点
   window.__petState = function () {
     return JSON.stringify({ acting: acting, walking: !!walking, busy: busy,
